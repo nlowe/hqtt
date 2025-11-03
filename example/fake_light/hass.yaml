@@ -1,0 +1,32 @@
+default_config:
+logger:
+  default: info
+  logs:
+    homeassistant.components.mqtt: debug
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 10.0.0.0/8
+    - 127.0.0.1/32
+
+prometheus:
+  namespace: hass
+
+homeassistant:
+  name: Home
+
+  latitude: 41.4969112
+  longitude: -81.6844258
+  elevation: 18
+
+  country: US
+  language: en
+  currency: USD
+
+  time_zone: America/New_York
+
+  unit_system: us_customary
+
+# Home Assistant is stupid and won't let you configure an MQTT broker automatically anymore
+# See https://github.com/home-assistant/architecture/blob/master/adr/0010-integration-configuration.md#decision
