@@ -92,7 +92,7 @@ type Device struct {
 	// A list of IDs that uniquely identify the device. For example a serial number.
 	Identifiers []string `json:"ids,omitempty"`
 
-	// Suggest an area if the devic e isn't in one yet
+	// Suggest an area if the device isn't in one yet
 	SuggestedArea string `json:"sa,omitempty"`
 
 	// It is recommended to add information about the origin of MQTT entities. The origin details will be logged in the
@@ -209,6 +209,5 @@ func (d *Device) Configure(ctx context.Context, w mqtt.Writer, discoveryPrefix s
 		return fmt.Errorf("configure: marshal discovery config: %w", err)
 	}
 
-	topic := fmt.Sprintf(`%s/device/%s/config`, discoveryPrefix, d.ID())
-	return w.WriteTopic(ctx, topic, mqtt.WriteOptions{Retain: true}, buf.Bytes())
+	return w.WriteTopic(ctx, mqtt.JoinTopic(discoveryPrefix, "device", d.ID(), "config"), mqtt.WriteOptions{Retain: true}, buf.Bytes())
 }

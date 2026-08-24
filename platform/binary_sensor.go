@@ -36,10 +36,8 @@ func (s *BinarySensor[TAttributes]) ServeMQTT(w mqtt.Writer, topic string, messa
 
 func NewBinarySensor[TAttributes any](state *mqtt.Value[hass.PowerState], attrs *mqtt.Value[TAttributes]) *BinarySensor[TAttributes] {
 	return &BinarySensor[TAttributes]{
-		Sensor: Sensor[hass.PowerState, TAttributes]{
-			State:      state,
-			Attributes: attrs,
-		},
+		State:      state,
+		Attributes: attrs,
 	}
 }
 

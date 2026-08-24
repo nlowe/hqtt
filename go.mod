@@ -1,6 +1,6 @@
 module github.com/nlowe/hqtt
 
-go 1.25
+go 1.27
 
 require (
 	github.com/eclipse/paho.golang v0.23.0

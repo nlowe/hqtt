@@ -244,32 +244,20 @@ func (l *Light) Subscriptions(prefix string) []mqtt.Subscription {
 // non-nil mqtt.RemoveValue that has a matching topic for the light. It is up to the user to ensure each configured
 // mqtt.RemoteValue has a unique Topic configured.
 func (l *Light) ServeMQTT(w mqtt.Writer, topic string, payload []byte) {
-	switch topic {
-	case l.Command.FullyQualifiedTopic(""):
-		l.Command.ServeMQTT(w, topic, payload)
-	case l.ColorModeCommand.FullyQualifiedTopic(""):
-		l.ColorModeCommand.ServeMQTT(w, topic, payload)
-	case l.BrightnessCommand.FullyQualifiedTopic(""):
-		l.BrightnessCommand.ServeMQTT(w, topic, payload)
-	case l.ColorTemperatureCommand.FullyQualifiedTopic(""):
-		l.ColorTemperatureCommand.ServeMQTT(w, topic, payload)
-	case l.HueSatCommand.FullyQualifiedTopic(""):
-		l.HueSatCommand.ServeMQTT(w, topic, payload)
-	case l.XYCommand.FullyQualifiedTopic(""):
-		l.XYCommand.ServeMQTT(w, topic, payload)
-	case l.RGBCommand.FullyQualifiedTopic(""):
-		l.RGBCommand.ServeMQTT(w, topic, payload)
-	case l.RGBWCommand.FullyQualifiedTopic(""):
-		l.RGBWCommand.ServeMQTT(w, topic, payload)
-	case l.RGBWWCommand.FullyQualifiedTopic(""):
-		l.RGBWWCommand.ServeMQTT(w, topic, payload)
-	case l.WhiteBrightnessCommand.FullyQualifiedTopic(""):
-		l.WhiteBrightnessCommand.ServeMQTT(w, topic, payload)
-	case l.EffectCommand.FullyQualifiedTopic(""):
-		l.EffectCommand.ServeMQTT(w, topic, payload)
-	default:
-		// TODO: Log?
-	}
+	mqtt.Dispatch(
+		"",
+		l.Command,
+		l.ColorModeCommand,
+		l.BrightnessCommand,
+		l.ColorTemperatureCommand,
+		l.HueSatCommand,
+		l.XYCommand,
+		l.RGBCommand,
+		l.RGBWCommand,
+		l.RGBWWCommand,
+		l.WhiteBrightnessCommand,
+		l.EffectCommand,
+	).ServeMQTT(w, topic, payload)
 }
 
 func (l *Light) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {

@@ -1,13 +1,13 @@
 version: '3'
 services:
   mqtt:
-    image: eclipse-mosquitto:2.0.22
+    image: eclipse-mosquitto:2.1.2-alpine
     container_name: mqtt
     ports:
       - "1883:1883" #default mqtt port
       - "9001:9001" #default mqtt port for websockets
     expose:
-      - "1883:1883"
+      - "1883"
     volumes:
       - mqtt-config:/mosquitto/config:rw
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
@@ -17,7 +17,7 @@ services:
 
   hass:
     container_name: hass
-    image: "ghcr.io/home-assistant/home-assistant:2025.11.2"
+    image: "ghcr.io/home-assistant/home-assistant:2026.8.3"
     ports:
       - "8123:8123"
     links:

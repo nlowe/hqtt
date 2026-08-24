@@ -1,9 +1,9 @@
 # hqtt - Go SDK for writing Home Assistant MQTT Integrations
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/nlowe/hqtt.svg)](https://pkg.go.dev/github.com/nlowe/hqtt) [![](https://github.com/nlowe/hqtt/workflows/CI/badge.svg)](https://github.com/nlowe/hqtt/actions) [![Coverage Status](https://coveralls.io/repos/github/nlowe/hqtt/badge.svg?branch=master)](https://coveralls.io/github/nlowe/hqtt?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/nlowe/hqtt)](https://goreportcard.com/report/github.com/nlowe/hqtt) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](./LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nlowe/hqtt.svg)](https://pkg.go.dev/github.com/nlowe/hqtt) [![](https://github.com/nlowe/hqtt/workflows/CI/badge.svg)](https://github.com/nlowe/hqtt/actions) [![Coverage Status](https://coveralls.io/repos/github/nlowe/hqtt/badge.svg?branch=master)](https://coveralls.io/github/nlowe/hqtt?branch=master) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](./LICENSE)
 
 > [!IMPORTANT]
-> This SDK Requires Go 1.25+. If using Go 1.25, the jsonv2 GOEXPERIMENT must be enabled.
+> This SDK Requires Go 1.27+.
 
 > [!WARNING]
 > This SDK is still under active development. The API probably ***will*** change. Feel free to experiment but expect
@@ -30,9 +30,9 @@ type Platform interface {
     // Device Discovery.
     PlatformName() string
 
-    // Subscriptions returns the set of paho.SubscribeOptions for configured fields of this component. Only fields that
-    // are properly configured should be included. Typically, each subscription is individually subscribed to, but other
-    // mqtt.Subscriber implementations may choose to group topics with wildcards.
+    // Subscriptions returns the set of mqtt.Subscription objects for configured fields of this component. Only fields
+    // that are properly configured should be included. Typically, each subscription is individually subscribed to, but
+    // other mqtt.Subscriber implementations may choose to group topics with wildcards.
     Subscriptions(prefix string) []mqtt.Subscription
 }
 ```
@@ -84,8 +84,8 @@ package mqtt
 
 // Writer is the minimum abstraction around writing values to MQTT.
 type Writer interface {
-	// WriteTopic writes the provided value to the specified topic with the specified WriteOptions.
-	WriteTopic(ctx context.Context, topic string, options WriteOptions, value []byte) error
+    // WriteTopic writes the provided value to the specified topic with the specified WriteOptions.
+    WriteTopic(ctx context.Context, topic string, options WriteOptions, value []byte) error
 }
 
 // Subscriber manages MQTT Subscriptions

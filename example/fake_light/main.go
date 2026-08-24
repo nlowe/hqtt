@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"net/url"
 	"os"
 	"os/signal"
@@ -29,7 +30,19 @@ func main() {
 		panic(err)
 	}
 
-	w, sm, hassAvailability, disconnect, err := configureMQTT(ctx, brokerURL)
+	topicPrefix := "hqtt/example"
+
+	// A single availability topic for all devices / entities produced by this integration
+	availability := mqtt.NewAbsoluteValueWithOptions[hass.Availability](
+		mqtt.JoinTopic(topicPrefix, "availability"),
+		hass.AvailabilityMarshaler,
+		mqtt.WriteOptions{
+			Retain: true,
+			QoS:    mqtt.QOSAtLeastOnce,
+		},
+	)
+
+	w, sm, hassAvailability, disconnect, err := configureMQTT(ctx, brokerURL, availability)
 	if err != nil {
 		panic(err)
 	}
@@ -41,22 +54,20 @@ func main() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 
-		log.Info("Disconnecting from mqtt")
 		if err := disconnect(shutdownCtx); err != nil {
 			log.With(hqttlog.Error(err)).Error("Failed to disconnect from mqtt")
 		}
+
+		log.Info("MQTT Disconnected")
 	}()
 
 	// Wait for Home Assistant to be available
 	_, err = hassAvailability.Await(ctx, mqtt.DesiredValue(hass.Available))
-
 	if err != nil {
 		panic(err)
 	}
 
 	log.Info("Home Assistant is now available")
-
-	topicPrefix := "hqtt/example"
 
 	// Setup Discovery
 	log.Info("Setting up device")
@@ -66,9 +77,9 @@ func main() {
 		TopicPrefix: mqtt.JoinTopic(topicPrefix, "foo"),
 
 		DefaultEntityID: "light.foo",
-		Icon:            "mdi:light",
+		Icon:            "mdi:floor-lamp",
 
-		Availability: mqtt.NewValueWithOptions[hass.Availability]("available", hass.AvailabilityMarshaler, mqtt.WriteOptions{Retain: true}),
+		Availability: availability,
 
 		Platform: &platform.Light{
 			OnCommandType: platform.LightOnCommandTypeLast,
@@ -111,14 +122,14 @@ func main() {
 		TopicPrefix: mqtt.JoinTopic(topicPrefix, "foo_pir"),
 
 		DefaultEntityID: "binary_sensor.foo_pir",
-		Icon:            "mdi:light",
+		Icon:            "mdi:motion-sensor",
 
 		Platform: platform.NewBinarySensor(
 			mqtt.NewValueWithOptions[hass.PowerState]("state", hass.PowerStateMarshaler, mqtt.WriteOptions{Retain: true}),
 			platform.NewSensorAttributeValue[map[string]any]("attributes", nil),
 		),
 
-		Availability: mqtt.NewValueWithOptions[hass.Availability]("available", hass.AvailabilityMarshaler, mqtt.WriteOptions{Retain: true}),
+		Availability: availability,
 	}
 
 	d := &hqtt.Device{
@@ -150,6 +161,32 @@ func main() {
 		_, _ = l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, hass.ColorModeRGB)
 	})
 
+	go func() {
+		log.Info("Starting fake presence sensor loop")
+
+		for {
+			select {
+			case <-time.After(time.Duration(rand.IntN(10)+1) * time.Second):
+				last, ok := s.Platform.Sensor.State.Get()
+
+				next := hass.PowerStateUnknown
+				if !ok {
+					next = hass.PowerStateOn
+				} else if last == hass.PowerStateOn {
+					next = hass.PowerStateOff
+				} else {
+					next = hass.PowerStateOn
+				}
+
+				log.With(slog.Any("state", next)).Debug("Updating fake presence sensor state")
+				_, _ = s.Platform.Sensor.State.Write(ctx, w, s.TopicPrefix, next)
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	components := map[string]json.MarshalerTo{
 		l.UniqueID: &l,
 		s.UniqueID: &s,
@@ -162,12 +199,10 @@ func main() {
 	}
 
 	republish := func() error {
-		log.Info("Republishing state/availability")
+		log.Info("Republishing state")
 		return errors.Join(
 			mqtt.Error(l.Platform.State.Write(ctx, w, l.TopicPrefix, hass.PowerStateOff)),
-			mqtt.Error(l.Availability.Write(ctx, w, l.TopicPrefix, hass.Available)),
 			mqtt.Error(s.Platform.State.Write(ctx, w, s.TopicPrefix, hass.PowerStateOff)),
-			mqtt.Error(s.Availability.Write(ctx, w, s.TopicPrefix, hass.Available)),
 		)
 	}
 

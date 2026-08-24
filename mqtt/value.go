@@ -72,7 +72,8 @@ func (w WriteOptions) LogValue() slog.Value {
 
 // Value holds a value that can be written to a mqtt topic.
 type Value[T any] struct {
-	topic string
+	topic    string
+	relative bool
 
 	marshaler ValueMarshaler[T]
 	// TODO: Self-subscribe to get the initial value if retained?
@@ -88,21 +89,50 @@ type Value[T any] struct {
 
 // NewValue constructs a Value configured for the provided topic and uses the provided marshaler when writing to mqtt
 // using default WriteOptions (QoS 0, no retain).
+//
+// When marshaling discovery information, Value marshals the configured topic string appended to any provided prefix.
 func NewValue[T any](topic string, marshal ValueMarshaler[T]) *Value[T] {
 	return NewValueWithOptions(topic, marshal, WriteOptions{})
 }
 
+// NewAbsoluteValue constructs a Value configured for the provided topic and uses the provided marshaler when writing to
+// mqtt using default WriteOptions (QoS 0, no retain).
+//
+// When marshaling discovery information, Value marshals the configured topic string as-is, without any prefix. This is
+// useful for shared values (for example, a single availability topic scoped to a device that all entities on the device
+// use).
+func NewAbsoluteValue[T any](topic string, marshal ValueMarshaler[T]) *Value[T] {
+	return NewAbsoluteValueWithOptions(topic, marshal, WriteOptions{})
+}
+
 // NewValueWithOptions constructs a Value configured for the provided topic and uses the provided marshaler when writing
 // to mqtt using the provided WriteOptions.
+//
+// When marshaling discovery information, Value marshals the configured topic string appended to any provided prefix.
 func NewValueWithOptions[T any](topic string, marshal ValueMarshaler[T], opts WriteOptions) *Value[T] {
+	return newValue(true, topic, marshal, opts)
+}
+
+// NewAbsoluteValueWithOptions constructs a Value configured for the provided topic and uses the provided marshaler when
+// writing to mqtt using the provided WriteOptions.
+//
+// When marshaling discovery information, Value marshals the configured topic string as-is, without any prefix. This is
+// useful for shared values (for example, a single availability topic scoped to a device that all entities on the device
+// use).
+func NewAbsoluteValueWithOptions[T any](topic string, marshal ValueMarshaler[T], opts WriteOptions) *Value[T] {
+	return newValue(false, topic, marshal, opts)
+}
+
+func newValue[T any](relative bool, topic string, marshal ValueMarshaler[T], opts WriteOptions) *Value[T] {
 	return &Value[T]{
-		topic:     topic,
+		topic:    topic,
+		relative: relative,
+
 		marshaler: marshal,
 		opts:      opts,
 
 		log: log.ForComponent("mqtt.value"),
 	}
-
 }
 
 // FullyQualifiedTopic calculates the MQTT Topic for this value when given the specified prefix. If the underlying Value
@@ -112,7 +142,16 @@ func (v *Value[T]) FullyQualifiedTopic(prefix string) string {
 		return ""
 	}
 
-	return JoinTopic(prefix, v.topic)
+	if v.relative {
+		return JoinTopic(prefix, v.topic)
+	}
+
+	return v.topic
+}
+
+// WriteOptions returns the configured WriteOptions for this Value
+func (v *Value[T]) WriteOptions() WriteOptions {
+	return v.opts
 }
 
 // Get returns the most recently written value and a bool indicating whether the most recent write was successful, which
@@ -363,11 +402,19 @@ func DesiredValue[T comparable](v T) func(T) bool {
 //
 // If the underlying type of this remote value is comparable, you can use DesiredValue to construct the check.
 //
+// If the most recently received value passes the desired filter, Await returns immediately without waiting for a new
+// value.
+//
 // Note that the underlying value of this RemoteValue may change between when the filter passes and when this function
 // returns. The returned value is the first value to pass the desired filter function and may not be the underlying
 // value for frequently updated values.
 func (v *RemoteValue[T]) Await(ctx context.Context, desired func(T) bool) (T, error) {
 	done := make(chan struct{})
+
+	if vv, ok := v.Get(); ok && desired(vv) {
+		v.log.Debug("Desired value already available")
+		return vv, nil
+	}
 
 	v.log.Debug("Awaiting value")
 

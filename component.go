@@ -65,8 +65,6 @@ func (c *Component[TPlatform]) ForRemoval() RemoveComponent {
 
 // Subscribe registers MQTT Subscriptions for fields in use by this Component using the provided
 // mqtt.SubscriptionManager. The subscriptions can be removed by calling Unsubscribe.
-//
-// TODO: Wire LWT to availability.
 func (c *Component[TPlatform]) Subscribe(ctx context.Context, s mqtt.Subscriber) error {
 	if len(c.subscribedTopics) != 0 {
 		return ErrComponentAlreadySubscribed
@@ -102,8 +100,6 @@ func (c *Component[TPlatform]) Unsubscribe(ctx context.Context, s mqtt.Subscribe
 }
 
 func (c *Component[TPlatform]) MarshalJSONTo(e *jsontext.Encoder) error {
-	// TODO: Name: Home Assistant docs say "Can be set to `null` if only the device name is relevant." Does this mean
-	//       omitted? The value should be a literal json null? The string "null"?
 	nameToken := jsontext.Null
 	if c.Name != "" {
 		nameToken = jsontext.String(c.Name)

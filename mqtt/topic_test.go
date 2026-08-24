@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:goconst
 func TestTrimTopic(t *testing.T) {
 	for _, tt := range []struct {
 		topic string
@@ -28,6 +29,7 @@ func TestTrimTopic(t *testing.T) {
 	}
 }
 
+//nolint:goconst
 func TestJoinTopic(t *testing.T) {
 	for i, tt := range []struct {
 		parts []string

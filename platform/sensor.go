@@ -47,6 +47,8 @@ type Sensor[TValue, TAttributes any] struct {
 	// The hass.StateClass of the sensor.
 	StateClass hass.StateClass
 
+	// TODO: DeviceClass?
+
 	// The current value of the sensor
 	State *mqtt.Value[TValue] `hqtt:"required"`
 

@@ -8,8 +8,10 @@ import (
 
 	// TODO: Can we pull this out easily and make this an optional dependency without making the module too complicated?
 	"github.com/eclipse/paho.golang/autopaho"
+	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 
+	"github.com/nlowe/hqtt/hass"
 	hqttlog "github.com/nlowe/hqtt/log"
 	"github.com/nlowe/hqtt/mqtt"
 )
@@ -21,6 +23,7 @@ type adapter struct {
 	r    paho.Router
 
 	subscriptions map[string]paho.SubscribeOptions
+	availability  *mqtt.Value[hass.Availability]
 
 	log *slog.Logger
 }
@@ -28,13 +31,40 @@ type adapter struct {
 var _ mqtt.Writer = &adapter{}
 var _ mqtt.Subscriber = &adapter{}
 
-func DialMQTT(ctx context.Context, config autopaho.ClientConfig) (mqtt.Writer, mqtt.Subscriber, func(ctx context.Context) error, error) {
+func DialMQTT(ctx context.Context, config autopaho.ClientConfig, availability *mqtt.Value[hass.Availability]) (mqtt.Writer, mqtt.Subscriber, func(ctx context.Context) error, error) {
 	a := &adapter{
 		r: paho.NewStandardRouter(),
 
 		subscriptions: map[string]paho.SubscribeOptions{},
+		availability:  availability,
 
 		log: hqttlog.ForComponent("autopaho"),
+	}
+
+	if availability != nil {
+		if config.WillMessage != nil {
+			return nil, nil, nil, fmt.Errorf("cannot use auto-availability with custom will message")
+		}
+
+		opts := availability.WriteOptions()
+		config.WillMessage = &paho.WillMessage{
+			Retain:  opts.Retain,
+			QoS:     byte(opts.QoS),
+			Topic:   availability.FullyQualifiedTopic(""),
+			Payload: []byte(hass.Unavailable),
+		}
+
+		// TODO: WillProperties?
+
+		a.log.With(
+			slog.GroupAttrs(
+				"will",
+				slog.Any("retain", opts.Retain),
+				slog.Any("qos", opts.QoS),
+				slog.String("topic", config.WillMessage.Topic),
+				slog.String("payload", string(config.WillMessage.Payload)),
+			),
+		).Debug("Configured Last Will Message")
 	}
 
 	// Overwrite the OnConnectionUp handler to deal with re-subscribing.
@@ -45,6 +75,25 @@ func DialMQTT(ctx context.Context, config autopaho.ClientConfig) (mqtt.Writer, m
 		if originalOnConnUp != nil {
 			originalOnConnUp(manager, connack)
 		}
+	}
+
+	originalDisconnectPacketBuilder := config.DisconnectPacketBuilder
+	config.DisconnectPacketBuilder = func() *paho.Disconnect {
+		var result *paho.Disconnect
+		if originalDisconnectPacketBuilder != nil {
+			result = originalDisconnectPacketBuilder()
+		}
+
+		if result == nil {
+			result = &paho.Disconnect{ReasonCode: packets.DisconnectNormalDisconnection}
+		}
+
+		// If we have availability configured, we need to tell the broker to still publish our Will when we disconnect
+		if availability != nil {
+			result.ReasonCode = packets.DisconnectDisconnectWithWillMessage
+		}
+
+		return result
 	}
 
 	// Lock the adapter before starting the connection so the first OnConnectionUp callback (which calls a.onReconnect)
@@ -78,6 +127,17 @@ func (a *adapter) onReconnect(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	a.log.Debug("Reconnected to MQTT")
+
+	if a.availability != nil {
+		a.log.Debug("Publishing Birth Message")
+
+		// TODO: Retry? Somehow lift this failure to the consumer?
+		if _, err := a.availability.Write(ctx, a, "", hass.Available); err != nil {
+			a.log.With(hqttlog.Error(err)).Error("Failed to publish birth message to mqtt")
+		}
+	}
+
 	if len(a.subscriptions) == 0 {
 		return
 	}
@@ -90,9 +150,8 @@ func (a *adapter) onReconnect(ctx context.Context) {
 		sub.Subscriptions = append(sub.Subscriptions, s)
 	}
 
-	a.log.Debug("Reconnected to MQTT. Re-sending subscriptions.")
-	_, err := a.conn.Subscribe(ctx, sub)
-	if err != nil {
+	a.log.Debug("Re-sending subscriptions.")
+	if _, err := a.conn.Subscribe(ctx, sub); err != nil {
 		// TODO: Retry? Somehow lift this failure to the consumer?
 		a.log.With(hqttlog.Error(err)).Error("Failed to re-subscribe to mqtt topics")
 	}

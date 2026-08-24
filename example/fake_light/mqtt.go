@@ -18,7 +18,7 @@ import (
 
 type disconnectFunc func(context.Context) error
 
-func configureMQTT(ctx context.Context, brokerURL *url.URL) (mqtt.Writer, mqtt.Subscriber, *mqtt.RemoteValue[hass.Availability], disconnectFunc, error) {
+func configureMQTT(ctx context.Context, brokerURL *url.URL, availability *mqtt.Value[hass.Availability]) (mqtt.Writer, mqtt.Subscriber, *mqtt.RemoteValue[hass.Availability], disconnectFunc, error) {
 	log := hqttlog.ForComponent("mqtt")
 
 	mqttConfig := autopaho.ClientConfig{
@@ -38,32 +38,30 @@ func configureMQTT(ctx context.Context, brokerURL *url.URL) (mqtt.Writer, mqtt.S
 			slog.With(hqttlog.Error(err)).Error("mqtt connection error")
 		},
 
-		ClientConfig: paho.ClientConfig{
-			ClientID: "hqtt:example:fake_light",
-			OnClientError: func(err error) {
-				log.With(hqttlog.Error(err)).Error("mqtt client error")
-			},
-			OnServerDisconnect: func(d *paho.Disconnect) {
-				log := log.With(slog.Int("reason", int(d.ReasonCode)))
+		ClientID: "hqtt:example:fake_light",
+		OnClientError: func(err error) {
+			log.With(hqttlog.Error(err)).Error("mqtt client error")
+		},
+		OnServerDisconnect: func(d *paho.Disconnect) {
+			log := log.With(slog.Int("reason", int(d.ReasonCode)))
 
-				if d.Properties != nil {
-					log = log.With(
-						slog.Group(
-							"properties",
-							slog.String("reference", d.Properties.ServerReference),
-							slog.String("reason", d.Properties.ReasonString),
-							slog.Any("user", d.Properties.User),
-						),
-					)
-				}
+			if d.Properties != nil {
+				log = log.With(
+					slog.Group(
+						"properties",
+						slog.String("reference", d.Properties.ServerReference),
+						slog.String("reason", d.Properties.ReasonString),
+						slog.Any("user", d.Properties.User),
+					),
+				)
+			}
 
-				log.Warn("Disconnected from server")
-			},
+			log.Warn("Disconnected from server")
 		},
 	}
 
 	log.With(slog.String("broker", brokerURL.String())).Info("Connecting to mqtt")
-	w, s, disconnect, err := adapter.DialMQTT(ctx, mqttConfig)
+	w, s, disconnect, err := adapter.DialMQTT(ctx, mqttConfig, availability)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("mqtt: connect: %w", err)
 	}

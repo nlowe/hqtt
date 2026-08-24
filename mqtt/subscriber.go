@@ -42,6 +42,32 @@ func (f HandlerFunc) ServeMQTT(w Writer, topic string, message []byte) {
 	f(w, topic, message)
 }
 
+// TopicHandler is a Handler that can provide the exact topic that the Handler cares about.
+type TopicHandler interface {
+	Handler
+
+	FullyQualifiedTopic(prefix string) string
+}
+
+// Dispatch returns a Handler that routes messages to the first TopicHandler that exactly matches the topic of published
+// messages.
+func Dispatch(prefix string, topicHandlers ...TopicHandler) Handler {
+	return HandlerFunc(func(w Writer, topic string, payload []byte) {
+		for _, t := range topicHandlers {
+			if t == nil {
+				continue
+			}
+
+			if t.FullyQualifiedTopic(prefix) == topic {
+				t.ServeMQTT(w, topic, payload)
+				return
+			}
+		}
+
+		// TODO: Log?
+	})
+}
+
 // Subscriber manages MQTT Subscriptions
 type Subscriber interface {
 	// Subscribe configures the underlying MQTT connection to send the client messages for the provided subscriptions.
