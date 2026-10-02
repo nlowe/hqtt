@@ -26,10 +26,10 @@ const (
 
 	FieldRGBCommandTopic   = "rgb_cmd_t"
 	FieldRGBStateTopic     = "rgb_stat_t"
-	FieldRGBWCommandTopic  = "rgbW_cmd_t"
-	FieldRGBWStateTopic    = "rgbW_stat_t"
-	FieldRGBWWCommandTopic = "rgbWW_cmd_t"
-	FieldRGBWWStateTopic   = "rgbWW_stat_t"
+	FieldRGBWCommandTopic  = "rgbw_cmd_t"
+	FieldRGBWStateTopic    = "rgbw_stat_t"
+	FieldRGBWWCommandTopic = "rgbww_cmd_t"
+	FieldRGBWWStateTopic   = "rgbww_stat_t"
 
 	FieldWhiteCommandTopic = "whit_cmd_t"
 	FieldWhiteScale        = "whit_scl"

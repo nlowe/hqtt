@@ -3,7 +3,6 @@ package hqtt
 import (
 	"context"
 	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"errors"
 	"net/url"
 	"strings"
@@ -99,7 +98,7 @@ func (c *Component[TPlatform]) Unsubscribe(ctx context.Context, s mqtt.Subscribe
 	return s.Unsubscribe(ctx, topics...)
 }
 
-func (c *Component[TPlatform]) MarshalJSONTo(e *jsontext.Encoder) error {
+func (c *Component[TPlatform]) MarshalComponentDiscoveryTo(e *jsontext.Encoder) error {
 	nameToken := jsontext.Null
 	if c.Name != "" {
 		nameToken = jsontext.String(c.Name)
@@ -122,11 +121,11 @@ func (c *Component[TPlatform]) MarshalJSONTo(e *jsontext.Encoder) error {
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldPayloadNotAvailable, c.CustomAvailabilityValues.Unavailable),
 
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldDefaultEntityID, c.DefaultEntityID),
-		discovery.MaybeMarshalStdComparable(e, discovery.FieldUniqueID, c.UniqueID),
+		discovery.MarshalStdComparable("UniqueID", e, discovery.FieldUniqueID, c.UniqueID),
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldQualityOfService, c.WriteOptions.QoS),
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldRetain, c.WriteOptions.Retain),
 
-		c.Platform.MarshalDiscoveryTo(e, c.TopicPrefix),
+		c.Platform.MarshalPlatformDiscoveryTo(e, c.TopicPrefix),
 
 		e.WriteToken(jsontext.EndObject),
 	)
@@ -138,6 +137,11 @@ type RemoveComponent struct {
 	Platform string `json:"platform"`
 }
 
-func (r RemoveComponent) MarshalJSONTo(e *jsontext.Encoder) error {
-	return json.MarshalEncode(e, &r)
+func (r RemoveComponent) MarshalComponentDiscoveryTo(e *jsontext.Encoder) error {
+	return errors.Join(
+		e.WriteToken(jsontext.BeginObject),
+		e.WriteToken(jsontext.String("platform")),
+		e.WriteToken(jsontext.String(r.Platform)),
+		e.WriteToken(jsontext.EndObject),
+	)
 }

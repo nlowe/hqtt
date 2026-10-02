@@ -21,10 +21,7 @@ package hqtt
 // Platform is the interface implemented by every MQTT Entity Component type.
 type Platform interface {
     mqtt.Handler
-
-    // MarshalDiscoveryTo marshals MQTT Device Discovery information to the specified jsontext.Encoder using the
-    // provided prefix for all MQTT Topics.
-    MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error
+    discovery.PlatformMarshaler
 
     // PlatformName returns the value for the `platform` field when configuring a component using this platform for MQTT
     // Device Discovery.
@@ -48,8 +45,7 @@ but if you find yourself implementing a core MQTT Entity type provided by Home A
 add it to the SDK!
 
 The [`discovery` package](https://pkg.go.dev/github.com/nlowe/hqtt/discovery) provides helpers for constructing minified
-Device Discovery payloads (including constants for abbreviated field keys). Unless you are implementing support for a
-new platform you will typically not need to import this package.
+Device Discovery payloads (including constants for abbreviated field keys).
 
 This package also contains a helper for watching the state of Home Assistant itself (which it publishes to
 `homeassistant/status` by default).

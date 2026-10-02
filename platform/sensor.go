@@ -67,7 +67,7 @@ func (s *Sensor[TValue, TAttributes]) Subscriptions(_ string) []mqtt.Subscriptio
 
 func (s *Sensor[TValue, TAttributes]) ServeMQTT(_ mqtt.Writer, _ string, _ []byte) {}
 
-func (s *Sensor[TValue, TAttributes]) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {
+func (s *Sensor[TValue, TAttributes]) MarshalPlatformDiscoveryTo(e *jsontext.Encoder, prefix string) error {
 	return errors.Join(
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldExpireMeasurementsAfter, s.ExpireMeasurementsAfter),
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldForceUpdate, s.ForceUpdate),

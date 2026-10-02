@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"log/slog"
 	"math/rand/v2"
@@ -62,8 +61,7 @@ func main() {
 	}()
 
 	// Wait for Home Assistant to be available
-	_, err = hassAvailability.Await(ctx, mqtt.DesiredValue(hass.Available))
-	if err != nil {
+	if err = mqtt.Error(hassAvailability.Await(ctx, mqtt.DesiredValue(hass.Available))); err != nil {
 		panic(err)
 	}
 
@@ -140,25 +138,41 @@ func main() {
 	log.Info("Watching Command Topics")
 	l.Platform.Command.Watch(func(s hass.PowerState) {
 		log.With(slog.Any("state", s)).Info("Home Assistant sent light command")
-		_, _ = l.Platform.State.Write(ctx, w, l.TopicPrefix, s)
+		if err = mqtt.Error(l.Platform.State.Write(ctx, w, l.TopicPrefix, s)); err != nil {
+			log.With(hqttlog.Error(err)).Error("Failed to update light state after receiving state command")
+		}
 	})
 	l.Platform.ColorModeCommand.Watch(func(m hass.ColorMode) {
 		log.With(slog.Any("mode", m)).Info("Home Assistant set color mode")
-		_, _ = l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, m)
+		if err = mqtt.Error(l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, m)); err != nil {
+			log.With(hqttlog.Error(err)).Error("Failed to update color mode after receiving mode command")
+		}
 	})
 	l.Platform.BrightnessCommand.Watch(func(u uint) {
 		log.With(slog.Any("brightness", u)).Info("Home Assistant set brightness command")
-		_, _ = l.Platform.Brightness.Write(ctx, w, l.TopicPrefix, u)
+		if err = mqtt.Error(l.Platform.Brightness.Write(ctx, w, l.TopicPrefix, u)); err != nil {
+			log.With(hqttlog.Error(err)).Error("Failed to update brightness after receiving brightness command")
+		}
 	})
 	l.Platform.ColorTemperatureCommand.Watch(func(u uint) {
 		log.With(slog.Any("color-temp", u)).Info("Home Assistant set color temperature")
-		_, _ = l.Platform.ColorTemperature.Write(ctx, w, l.TopicPrefix, u)
-		_, _ = l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, hass.ColorModeTemperature)
+
+		if err = errors.Join(
+			mqtt.Error(l.Platform.ColorTemperature.Write(ctx, w, l.TopicPrefix, u)),
+			mqtt.Error(l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, hass.ColorModeTemperature)),
+		); err != nil {
+			log.With(hqttlog.Error(err)).Error("Failed to update color temperature and/or mode after receiving color temperature command")
+		}
 	})
 	l.Platform.RGBCommand.Watch(func(rgb platform.RGB) {
 		log.With(slog.Any("rgb", rgb)).Info("Home Assistant set color")
-		_, _ = l.Platform.RGB.Write(ctx, w, l.TopicPrefix, rgb)
-		_, _ = l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, hass.ColorModeRGB)
+
+		if err = errors.Join(
+			mqtt.Error(l.Platform.RGB.Write(ctx, w, l.TopicPrefix, rgb)),
+			mqtt.Error(l.Platform.ColorMode.Write(ctx, w, l.TopicPrefix, hass.ColorModeRGB)),
+		); err != nil {
+			log.With(hqttlog.Error(err)).Error("Failed to update rgb and/or color mode after receiving rgb command")
+		}
 	})
 
 	go func() {
@@ -179,7 +193,9 @@ func main() {
 				}
 
 				log.With(slog.Any("state", next)).Debug("Updating fake presence sensor state")
-				_, _ = s.Platform.Sensor.State.Write(ctx, w, s.TopicPrefix, next)
+				if err := mqtt.Error(s.Platform.Sensor.State.Write(ctx, w, s.TopicPrefix, next)); err != nil {
+					log.With(hqttlog.Error(err)).Error("Failed to update fake presence sensor state")
+				}
 
 			case <-ctx.Done():
 				return
@@ -187,7 +203,7 @@ func main() {
 		}
 	}()
 
-	components := map[string]json.MarshalerTo{
+	components := map[string]discovery.ComponentMarshaler{
 		l.UniqueID: &l,
 		s.UniqueID: &s,
 	}
@@ -195,7 +211,7 @@ func main() {
 	// TODO: Plumb through retain
 	rediscover := func() error {
 		log.Info("Re-sending discovery info")
-		return d.Configure(ctx, w, discovery.DefaultPrefix, components)
+		return d.Configure(ctx, w, mqtt.WriteOptions{Retain: true}, discovery.DefaultPrefix, components)
 	}
 
 	republish := func() error {
@@ -216,11 +232,10 @@ func main() {
 		}
 	})
 
-	if err = rediscover(); err != nil {
-		panic(err)
-	}
-
-	if err = republish(); err != nil {
+	if err = errors.Join(
+		rediscover(),
+		republish(),
+	); err != nil {
 		panic(err)
 	}
 

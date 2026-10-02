@@ -5,11 +5,12 @@ import (
 	"cmp"
 	"context"
 	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/nlowe/hqtt/discovery"
@@ -80,7 +81,8 @@ type Device struct {
 	// internal homeassistant:// URL.
 	ConfigurationURL *url.URL `json:"cu,omitempty"`
 
-	// A list of connections of the device to the outside world. For example, `[]DeviceConnection{{Kind: "mac", Value: "02:5b:26:a8:dc:12"]}}`
+	// A list of connections of the device to the outside world. For example,
+	// `[]DeviceConnection{{Kind: "mac", Value: "02:5b:26:a8:dc:12"]}}`
 	Connections []DeviceConnection `json:"cns,omitempty"`
 
 	// The hardware version of the device.
@@ -175,7 +177,7 @@ func (d *Device) Valid() error {
 // calling Configure.
 //
 // The device must pass validation performed by Device.Valid.
-func (d *Device) Configure(ctx context.Context, w mqtt.Writer, discoveryPrefix string, components map[string]json.MarshalerTo) error {
+func (d *Device) Configure(ctx context.Context, w mqtt.Writer, opts mqtt.WriteOptions, discoveryPrefix string, components map[string]discovery.ComponentMarshaler) error {
 	// Validation
 	if err := d.Valid(); err != nil {
 		return err
@@ -197,9 +199,21 @@ func (d *Device) Configure(ctx context.Context, w mqtt.Writer, discoveryPrefix s
 
 		e.WriteToken(jsontext.String(discovery.FieldComponents)),
 		e.WriteToken(jsontext.BeginObject),
+	)
 
-		discovery.MaybeInlineMarshalStd(e, components),
+	if len(components) > 0 {
+		// Marshal components in sorted order for consistency
+		for _, k := range slices.Sorted(maps.Keys(components)) {
+			err = errors.Join(
+				err,
+				e.WriteToken(jsontext.String(k)),
+				components[k].MarshalComponentDiscoveryTo(e),
+			)
+		}
+	}
 
+	err = errors.Join(
+		err,
 		e.WriteToken(jsontext.EndObject),
 		// TODO: Shared QoS?
 		e.WriteToken(jsontext.EndObject),
@@ -209,5 +223,15 @@ func (d *Device) Configure(ctx context.Context, w mqtt.Writer, discoveryPrefix s
 		return fmt.Errorf("configure: marshal discovery config: %w", err)
 	}
 
-	return w.WriteTopic(ctx, mqtt.JoinTopic(discoveryPrefix, "device", d.ID(), "config"), mqtt.WriteOptions{Retain: true}, buf.Bytes())
+	return w.WriteTopic(
+		ctx,
+		mqtt.JoinTopic(
+			discoveryPrefix,
+			discovery.TopicSegmentTypeDevice,
+			d.ID(),
+			discovery.TopicSegmentDeviceConfig,
+		),
+		opts,
+		buf.Bytes(),
+	)
 }

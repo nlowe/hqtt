@@ -1,18 +1,14 @@
 package hqtt
 
 import (
-	"encoding/json/jsontext"
-
+	"github.com/nlowe/hqtt/discovery"
 	"github.com/nlowe/hqtt/mqtt"
 )
 
 // Platform is the interface implemented by every MQTT Entity Component type.
 type Platform interface {
 	mqtt.Handler
-
-	// MarshalDiscoveryTo marshals MQTT Device Discovery information to the specified jsontext.Encoder using the
-	// provided prefix for all MQTT Topics.
-	MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error
+	discovery.PlatformMarshaler
 
 	// PlatformName returns the value for the `platform` field when configuring a component using this platform for MQTT
 	// Device Discovery.

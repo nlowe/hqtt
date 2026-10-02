@@ -36,6 +36,19 @@ var (
 	)
 )
 
+type ComponentMarshaler interface {
+	// MarshalComponentDiscoveryTo implements MQTT Device Discovery by marshaling the JSON configuration payload to the
+	// specified jsontext.Encoder. Components must write a full JSON object, including begin/end object tokens.
+	MarshalComponentDiscoveryTo(e *jsontext.Encoder) error
+}
+
+type PlatformMarshaler interface {
+	// MarshalPlatformDiscoveryTo implements MQTT Device Discovery by marshaling the JSON configuration payload to the
+	// provided encoder. Platforms are marshaled inside the component context, and thus should marshal keys and values
+	// directly instead of a marshaling a full JSON object.
+	MarshalPlatformDiscoveryTo(e *jsontext.Encoder, topicPrefix string) error
+}
+
 // MarshalRequiredTopic encodes the topic for the discovery payload being built. It returns ErrTopicRequired if the
 // topic is the empty string.
 func MarshalRequiredTopic(name string, e *jsontext.Encoder, k string, topic string) error {

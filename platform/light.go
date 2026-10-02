@@ -75,6 +75,71 @@ var (
 
 		return RGB{uint8(r), uint8(g), uint8(b)}, errors.Join(errR, errG, errB)
 	}
+
+	RGBWMarshaler mqtt.ValueMarshaler[RGBW] = func(v RGBW) ([]byte, error) {
+		return []byte(fmt.Sprintf("%d,%d,%d, %d", v.R, v.G, v.B, v.W)), nil
+	}
+	RGBWUnmarshaler mqtt.ValueUnmarshaler[RGBW] = func(bytes []byte) (RGBW, error) {
+		parts := strings.Split(string(bytes), ",")
+		if len(parts) != 4 {
+			return RGBW{}, fmt.Errorf("invalid RGBW representation: %s", bytes)
+		}
+
+		r, errR := strconv.ParseUint(parts[0], 10, 8)
+		g, errG := strconv.ParseUint(parts[1], 10, 8)
+		b, errB := strconv.ParseUint(parts[2], 10, 8)
+		w, errW := strconv.ParseUint(parts[3], 10, 8)
+
+		return RGBW{RGB{uint8(r), uint8(g), uint8(b)}, uint8(w)}, errors.Join(errR, errG, errB, errW)
+	}
+
+	RGBWWMarshaler mqtt.ValueMarshaler[RGBWW] = func(v RGBWW) ([]byte, error) {
+		return []byte(fmt.Sprintf("%d,%d,%d,%d,%d", v.R, v.G, v.B, v.W, v.WW)), nil
+	}
+	RGBWWUnmarshaler mqtt.ValueUnmarshaler[RGBWW] = func(bytes []byte) (RGBWW, error) {
+		parts := strings.Split(string(bytes), ",")
+		if len(parts) != 5 {
+			return RGBWW{}, fmt.Errorf("invalid RGBWW representation: %s", bytes)
+		}
+
+		r, errR := strconv.ParseUint(parts[0], 10, 8)
+		g, errG := strconv.ParseUint(parts[1], 10, 8)
+		b, errB := strconv.ParseUint(parts[2], 10, 8)
+		w, errW := strconv.ParseUint(parts[3], 10, 8)
+		ww, errWW := strconv.ParseUint(parts[4], 10, 8)
+
+		return RGBWW{RGBW{RGB{uint8(r), uint8(g), uint8(b)}, uint8(w)}, uint8(ww)}, errors.Join(errR, errG, errB, errW, errWW)
+	}
+
+	HueSatMarshaler mqtt.ValueMarshaler[HueSat] = func(v HueSat) ([]byte, error) {
+		return []byte(fmt.Sprintf("%f,%f", v.Hue, v.Saturation)), nil
+	}
+	HueSatUnmarshaler mqtt.ValueUnmarshaler[HueSat] = func(bytes []byte) (HueSat, error) {
+		parts := strings.Split(string(bytes), ",")
+		if len(parts) != 2 {
+			return HueSat{}, fmt.Errorf("invalid HueSat representation: %s", bytes)
+		}
+
+		hue, errHue := strconv.ParseFloat(parts[0], 64)
+		sat, errSat := strconv.ParseFloat(parts[1], 64)
+
+		return HueSat{hue, sat}, errors.Join(errHue, errSat)
+	}
+
+	XYMarshaler mqtt.ValueMarshaler[XY] = func(v XY) ([]byte, error) {
+		return []byte(fmt.Sprintf("%f,%f", v.X, v.Y)), nil
+	}
+	XYUnmarshaler mqtt.ValueUnmarshaler[XY] = func(bytes []byte) (XY, error) {
+		parts := strings.Split(string(bytes), ",")
+		if len(parts) != 2 {
+			return XY{}, fmt.Errorf("invalid XY representation: %s", bytes)
+		}
+
+		x, errX := strconv.ParseFloat(parts[0], 64)
+		y, errY := strconv.ParseFloat(parts[1], 64)
+
+		return XY{x, y}, errors.Join(errX, errY)
+	}
 )
 
 // RGBW holds an 8-bit White value in addition to RGB values for a Light. It implements fmt.Stringer and slog.LogValuer.
@@ -260,7 +325,7 @@ func (l *Light) ServeMQTT(w mqtt.Writer, topic string, payload []byte) {
 	).ServeMQTT(w, topic, payload)
 }
 
-func (l *Light) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {
+func (l *Light) MarshalPlatformDiscoveryTo(e *jsontext.Encoder, prefix string) error {
 	return errors.Join(
 		discovery.MarshalStdIfNot(DefaultLightOnCommandType, e, discovery.FieldOnCommandType, l.OnCommandType),
 
@@ -278,7 +343,7 @@ func (l *Light) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {
 			discovery.FieldColorModeCommandTopic, l.ColorModeCommand,
 			prefix,
 		),
-		discovery.MaybeMarshalStd(e, discovery.FieldSupportedColorModes, &l.SupportedColorModes),
+		discovery.MaybeMarshalStdSlice(e, discovery.FieldSupportedColorModes, l.SupportedColorModes),
 		discovery.MaybeMarshalStateAndCommandTopics(
 			"brightness", e,
 			discovery.FieldBrightnessStateTopic, l.Brightness,
@@ -301,15 +366,15 @@ func (l *Light) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {
 
 		discovery.MaybeMarshalStateAndCommandTopics(
 			"hue sat", e,
-			discovery.FieldHueSatStateTopic, l.ColorTemperature,
-			discovery.FieldHueSatCommandTopic, l.ColorTemperatureCommand,
+			discovery.FieldHueSatStateTopic, l.HueSat,
+			discovery.FieldHueSatCommandTopic, l.HueSatCommand,
 			prefix,
 		),
 
 		discovery.MaybeMarshalStateAndCommandTopics(
 			"xy", e,
-			discovery.FieldXYCommandTopic, l.XY,
-			discovery.FieldXYStateTopic, l.XYCommand,
+			discovery.FieldXYStateTopic, l.XY,
+			discovery.FieldXYCommandTopic, l.XYCommand,
 			prefix,
 		),
 

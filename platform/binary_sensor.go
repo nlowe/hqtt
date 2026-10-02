@@ -41,9 +41,9 @@ func NewBinarySensor[TAttributes any](state *mqtt.Value[hass.PowerState], attrs 
 	}
 }
 
-func (s *BinarySensor[TAttributes]) MarshalDiscoveryTo(e *jsontext.Encoder, prefix string) error {
+func (s *BinarySensor[TAttributes]) MarshalPlatformDiscoveryTo(e *jsontext.Encoder, prefix string) error {
 	return errors.Join(
-		s.Sensor.MarshalDiscoveryTo(e, prefix),
+		s.Sensor.MarshalPlatformDiscoveryTo(e, prefix),
 		discovery.MaybeMarshalStdComparable(e, discovery.FieldOffDelay, s.OffDelay),
 	)
 }

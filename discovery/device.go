@@ -28,8 +28,13 @@ const (
 
 	FieldOptimistic = "opt"
 
-	// IDSep is the separator used to separate various parts of a device ID. It is also used as a replacement for tokens
-	// that are not allowed in an ID string.
+	TopicSegmentTypeDevice   = "device"
+	TopicSegmentDeviceConfig = "config"
+
+	// IDReplacement is the character used to replace invalid characters in IDs / MQTT Topics
+	IDReplacement = "_"
+
+	// IDSep is the separator used to separate various parts of a device ID.
 	IDSep = "__"
 )
 
@@ -37,11 +42,12 @@ var (
 	// IDSanitizer is a strings.Replacer that sanitizes a device ID for use in an MQTT Topic.
 	// TODO: Are there any other tokens we need to replace?
 	IDSanitizer = strings.NewReplacer(
-		" ", IDSep,
-		":", IDSep,
-		".", IDSep,
-		"!", IDSep,
-		"?", IDSep,
-		mqtt.TopicSeparator, IDSep,
+		" ", IDReplacement,
+		":", IDReplacement,
+		".", IDReplacement,
+		"!", IDReplacement,
+		"?", IDReplacement,
+		"=", IDReplacement,
+		mqtt.TopicSeparator, IDReplacement,
 	)
 )
