@@ -2,6 +2,7 @@ package autopaho
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -179,10 +180,16 @@ func (a *adapter) Subscribe(ctx context.Context, handler mqtt.Handler, subscript
 	}
 
 	sub := &paho.Subscribe{
-		Subscriptions: make([]paho.SubscribeOptions, len(subscriptions)),
+		Subscriptions: make([]paho.SubscribeOptions, 0, len(subscriptions)),
 	}
 
-	for i, s := range subscriptions {
+	var err error
+	for _, s := range subscriptions {
+		if _, ok := a.subscriptions[s.Topic]; ok {
+			err = errors.Join(err, fmt.Errorf("%s: %w", s.Topic, mqtt.ErrAlreadySubscribed))
+			continue
+		}
+
 		opts := paho.SubscribeOptions{
 			Topic:             s.Topic,
 			QoS:               uint8(s.Options.QoS),
@@ -192,15 +199,19 @@ func (a *adapter) Subscribe(ctx context.Context, handler mqtt.Handler, subscript
 		}
 
 		a.subscriptions[s.Topic] = opts
-		sub.Subscriptions[i] = opts
+		sub.Subscriptions = append(sub.Subscriptions, opts)
 
 		a.r.RegisterHandler(s.Topic, func(publish *paho.Publish) {
 			handler.ServeMQTT(a, publish.Topic, publish.Payload)
 		})
 	}
 
+	if err != nil {
+		return err
+	}
+
 	a.log.With(slog.Any("subscriptions", subscriptions)).Debug("Subscribing to MQTT Topic(s)")
-	_, err := a.conn.Subscribe(ctx, sub)
+	_, err = a.conn.Subscribe(ctx, sub)
 	return err
 }
 
@@ -210,6 +221,7 @@ func (a *adapter) Unsubscribe(ctx context.Context, topics ...string) error {
 
 	for _, t := range topics {
 		delete(a.subscriptions, t)
+		a.r.UnregisterHandler(t)
 	}
 
 	a.log.With(slog.Any("topics", topics)).Debug("Unsubscribing from MQTT Topic(s)")

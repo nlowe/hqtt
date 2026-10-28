@@ -2,8 +2,13 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 )
+
+// ErrAlreadySubscribed is returned by a Subscriber when one or more of the provided topic patterns are already
+// subscribed to.
+var ErrAlreadySubscribed = errors.New("already subscribed to topic pattern")
 
 // Subscription holds metadata for a MQTT subscription for a given topic. It implements fmt.Stringer and slog.LogValuer.
 type Subscription struct {
@@ -72,6 +77,9 @@ func Dispatch(prefix string, topicHandlers ...TopicHandler) Handler {
 type Subscriber interface {
 	// Subscribe configures the underlying MQTT connection to send the client messages for the provided subscriptions.
 	// The provided Handler will be called for all subscribed topics in this call.
+	//
+	// For a given topic pattern, only one Handler may be subscribed to a topic at any given time. Attempts to subscribe
+	// to a pattern multiple times will return ErrAlreadySubscribed.
 	Subscribe(ctx context.Context, handler Handler, subscriptions ...Subscription) error
 
 	// Unsubscribe removes any subscriptions configured for the specified topics.
