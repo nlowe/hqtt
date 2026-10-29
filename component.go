@@ -26,7 +26,7 @@ type Component[TPlatform Platform] struct {
 	Name string
 
 	// The category of the entity. See https://developers.home-assistant.io/docs/core/entity/#generic-properties
-	EntityCategory string
+	EntityCategory hass.EntityCategory
 
 	// The Icon to use in the frontend for this entity
 	Icon string

@@ -39,6 +39,15 @@ The following platforms are currently implemented:
 * [`binary_sensor`](https://www.home-assistant.io/integrations/binary_sensor.mqtt/): [`platform.BinarySensor[TAttributes any]`](https://pkg.go.dev/github.com/nlowe/hqtt/platform#BinarySensor)
 * [`light`](https://www.home-assistant.io/integrations/light.mqtt/): [`platform.Light`](https://pkg.go.dev/github.com/nlowe/hqtt/platform#Light)
 * [`sensor`](https://www.home-assistant.io/integrations/sensor.mqtt/): [`platform.Sensor[TValue, TAttributes any]`](https://pkg.go.dev/github.com/nlowe/hqtt/platform#Sensor)
+* [`update`](https://www.home-assistant.io/integrations/update.mqtt/): [`platform.Update`](https://pkg.go.dev/github.com/nlowe/hqtt/platform#Update)
+
+> [!NOTE]
+> Home Assistant recently re-organized integrations on https://home-assistant.io/integrations. Individual MQTT component
+> implementations no longer show up on the integrations page or in search. To find them, navigate to the
+> [`Configuration` section of the `MQTT` integration page](https://www.home-assistant.io/integrations/mqtt/#configuration)
+> and expand `Configuration of MQTT components via MQTT discovery` to see the full list.
+>
+> See https://github.com/home-assistant/home-assistant.io/issues/50026
 
 You can create a `Component` for other MQTT Entity types by providing a type that satisfies the `Platform` interface,
 but if you find yourself implementing a core MQTT Entity type provided by Home Assistant please send a pull request to

@@ -73,7 +73,7 @@ func assertHasRemoteValue[T any](t *testing.T, v *mqtt.RemoteValue[T], expected 
 
 	vv, ok := v.Get()
 
-	if assert.True(t, ok) {
+	if assert.True(t, ok, "expected a value to be written") {
 		assert.EqualValues(t, expected, vv)
 	}
 }
